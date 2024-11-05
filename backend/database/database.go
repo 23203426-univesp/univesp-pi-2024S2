@@ -3,80 +3,102 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"math/rand/v2"
 	"os"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type TestDocument struct {
-	ID   primitive.ObjectID `bson:"_id,omitempty"`
-	Name string
-	Age  int32
-}
+var client *mongo.Client = nil
 
-func Init() {
+func Init(ctx context.Context) error {
 	// Get MongoDB URI
 	uri := os.Getenv("MONGODB_URI")
 	if uri == "" {
-		log.Fatal("Set your 'MONGODB_URI' environment variable.")
+		return fmt.Errorf("set your 'MONGODB_URI' environment variable")
 	}
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
+	// Connect to database
+	var err error
+	client, err = mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to connect to MongoDB using %s: %s", uri, err)
 	}
 
-	defer func() {
-		if err := client.Disconnect(context.TODO()); err != nil {
-			panic(err)
-		}
-	}()
+	// Establish connection, pinging database
+	err = client.Ping(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to ping MongoDB server: %s", err)
+	}
 
-	testEntry := TestDocument{Name: "nome", Age: 31}
+	return nil
+}
 
+func Disconnect(ctx context.Context) error {
+	if client == nil {
+		return fmt.Errorf("client isn't ready")
+	}
+
+	// Disconnect and reset variable if successful
+	err := client.Disconnect(ctx)
+	if err == nil {
+		client = nil
+	}
+	return err
+}
+
+func randomChar() byte {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	return byte(charset[rand.IntN(len(charset))])
+}
+
+func randomString(length int) string {
+	var builder strings.Builder
+	builder.Grow(length)
+	for i := 0; i < length; i++ {
+		builder.WriteByte(randomChar())
+	}
+	return builder.String()
+}
+
+func Test(ctx context.Context) error {
+	if client == nil {
+		return fmt.Errorf("client isn't ready")
+	}
+
+	age := rand.Uint32N(100)
+	name := randomString(16)
+	testEntry := TestDocument{Name: name, Age: age}
 	coll := client.Database("psico").Collection("test")
 
-	_, err = coll.InsertOne(context.TODO(), testEntry)
+	_, err := coll.InsertOne(ctx, testEntry)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	cursor, err := coll.Find(context.TODO(), bson.D{{Key: "name", Value: "nome"}})
+	cursor, err := coll.Find(ctx, bson.D{})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	var results []TestDocument
-	err = cursor.All(context.TODO(), &results)
+	err = cursor.All(ctx, &results)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	for _, result  := range results {
+	for _, result := range results {
 		resultJson, err := json.Marshal(result)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		log.Printf("%s\n", resultJson)
 	}
-	// title := "Back to the Future"
-	// var result bson.M
-	// err = coll.FindOne(context.TODO(), bson.D{{"title", title}}).
-	// 	Decode(&result)
-	// if err == mongo.ErrNoDocuments {
-	// 	fmt.Printf("No document was found with the title %s\n", title)
-	// 	return
-	// }
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// jsonData, err := json.MarshalIndent(result, "", "    ")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Printf("%s\n", jsonData)
+
+	return nil
 }
