@@ -1,0 +1,17 @@
+
+<main>
+	<h1>Psico</h1>
+	<div>
+		<label for="username-input">Username: </label>
+		<input id="username-input" [(ngModel)]="username" (input)="validateUsername()" [attr.aria-invalid]="!isUsernameValid" aria-describedby="username-error">
+		<strong id="username-error" [hidden]="isUsernameValid">
+			Usuário inválido!
+		</strong>
+	</div>
+	<div *ngIf="isUsernameValid">
+		<h2>Olá, {{username}}!</h2>
+	</div>
+
+</main>
+
+<router-outlet />

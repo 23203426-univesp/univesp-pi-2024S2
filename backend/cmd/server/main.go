@@ -16,6 +16,7 @@ func main() {
 		log.Println("No .env file found")
 	}
 
+	// Initialize database
 	database.Init(context.Background())
 	defer database.Disconnect(context.Background())
 
@@ -23,6 +24,7 @@ func main() {
 	defer cancel()
 	database.Test(ctx)
 
+	// Initialize and run router
 	r := router.Setup()
 	r.Run()
 }

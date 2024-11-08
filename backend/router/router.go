@@ -23,7 +23,7 @@ func setupRoutes(engine *gin.Engine) {
 
 	engine.POST("/ping", func(context *gin.Context) {
 		post := Test{}
-		if bindErr := context.BindJSON(&post); bindErr != nil {
+		if err := context.BindJSON(&post); err != nil {
 			context.AbortWithStatus(http.StatusBadRequest)
 			return
 		}

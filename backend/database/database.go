@@ -27,7 +27,7 @@ func Init(ctx context.Context) error {
 	var err error
 	client, err = mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
-		return fmt.Errorf("failed to connect to MongoDB using %s: %s", uri, err)
+		return fmt.Errorf("failed to connect to MongoDB: %s", err)
 	}
 
 	// Establish connection, pinging database
