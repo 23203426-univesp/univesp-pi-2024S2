@@ -49,7 +49,7 @@ export default [
 			],
 			'@stylistic/brace-style': [
 				'error',
-				'stroustrup',
+				'1tbs',
 				{
 					allowSingleLine: true,
 				},
