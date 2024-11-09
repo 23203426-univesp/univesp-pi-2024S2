@@ -1,11 +1,25 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import {
+	provideRouter,
+	withHashLocation,
+	withRouterConfig,
+} from '@angular/router';
 
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
 	providers: [
-		provideZoneChangeDetection({ eventCoalescing: true }),
-		provideRouter(routes),
+		provideZoneChangeDetection({
+			eventCoalescing: true,
+		}),
+		provideRouter(
+			routes,
+			// Hashing allows manipulating URL manually without page reloads
+			withHashLocation(),
+			// Do reject so we don't have too much complex handlers
+			withRouterConfig({
+				resolveNavigationPromiseOnError: false,
+			}),
+		),
 	],
 };

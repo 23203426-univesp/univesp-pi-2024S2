@@ -1,0 +1,10 @@
+
+<div>
+	<label for="new-patient-name-input">Novo paciente: </label>
+	<input id="new-patient-name-input" [(ngModel)]="newPatientName">
+	<button (click)="submitNewPatient()" [disabled]="!newPatientName.length">Adicionar paciente</button>
+</div>
+
+<div *ngFor="let patient of patients">
+	<a [routerLink]="patient.link">{{patient.name}}</a>
+</div>

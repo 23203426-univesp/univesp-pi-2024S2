@@ -8,8 +8,8 @@ export interface KeyType {
 };
 
 export interface EncryptionResult {
-	iv: ArrayBuffer;
-	data: ArrayBuffer;
+	readonly iv: ArrayBuffer;
+	readonly data: ArrayBuffer;
 };
 
 type IKeyType = {

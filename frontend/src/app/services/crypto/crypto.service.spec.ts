@@ -53,6 +53,7 @@ describe('CryptoService', () => {
 		);
 		expect(wrappingKey).toBeTruthy();
 
+		// Wrapping requires 'extractable' flag
 		const key = await service.generateKey(
 			true,
 			KeyTypes.ENCRYPTION_KEY,

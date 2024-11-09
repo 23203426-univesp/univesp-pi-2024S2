@@ -1,23 +1,37 @@
 import { Routes } from '@angular/router';
-import { LoginComponent } from '@components/login/login.component';
+import { AuthComponent } from '@components/auth/auth.component';
 import { HomeComponent } from '@components/home/home.component';
-import { AuthGuard } from '@guards/auth/auth.guard';
-import { LoginGuard } from '@guards/login/login.guard';
+import { PatientComponent } from '@components/patient/patient.component';
+import { NotFoundComponent } from '@components/not-found/not-found.component';
+import { unauthenticatedGuard } from '@guards/unauthenticated.guard';
+import { authenticatedGuard } from '@guards/authenticated.guard';
 
 export const routes: Routes = [
 	{
-		path: 'login',
-		canActivate: [LoginGuard],
-		component: LoginComponent,
+		path: 'auth',
+		canActivate: [unauthenticatedGuard],
+		component: AuthComponent,
 	},
 	{
 		path: '',
-		canActivateChild: [AuthGuard],
+		canActivateChild: [authenticatedGuard],
 		children: [
 			{
 				path: '',
 				component: HomeComponent,
 			},
+			{
+				path: 'patient/:patientSlug',
+				component: PatientComponent,
+			},
 		],
+	},
+	{
+		path: 'not-found',
+		component: NotFoundComponent,
+	},
+	{
+		path: '**',
+		redirectTo: 'not-found',
 	},
 ];

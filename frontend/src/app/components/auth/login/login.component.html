@@ -1,0 +1,12 @@
+<h2>Login</h2>
+
+<app-username-field [inputId]="'username-input'" [inputLabel]="'Usuário: '" [disabled]="callingApi" (validatedInput)="changedUsername($event)"></app-username-field>
+
+<app-password-field [inputId]="'password-input'" [inputLabel]="'Senha: '" [disabled]="callingApi" (validatedInput)="changedPassword($event)"></app-password-field>
+
+<div>
+	<button (click)="submitLogin()" [disabled]="callingApi || !usernameValid || !passwordValid">Entrar</button>
+	<strong [hidden]="!loginError">
+		{{loginError}}
+	</strong>
+</div>

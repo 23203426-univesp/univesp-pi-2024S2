@@ -1,0 +1,7 @@
+<div>
+	<label [for]="inputId">{{inputLabel}}</label>
+	<input [id]="inputId" [(ngModel)]="username" [disabled]="disabled" (input)="validateUsername()">
+	<strong [hidden]="!username || usernameValid">
+		{{usernameError}}
+	</strong>
+</div>
