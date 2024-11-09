@@ -9,7 +9,7 @@ import { KeyTypes } from '@services/crypto/crypto.type';
 	providedIn: 'root',
 })
 export class UserService {
-	private readonly USERNAME_REGEX = /^[A-Za-z0-9_]{4,16}$/;
+	private readonly USERNAME_REGEX = /^[a-z0-9_]{4,16}$/;
 	private readonly MIN_PASSWORD_LENGTH = 8;
 	private readonly MAX_PASSWORD_LENGTH = 128;
 
@@ -29,11 +29,14 @@ export class UserService {
 	public validateUsername(username: string): void {
 		if (!this.USERNAME_REGEX.test(username)) {
 			throw new Error('Deve ter comprimento entre 4 e 16 caracteres '
-				+ 'e não utilizar caracteres especiais.');
+				+ 'e não utilizar caracteres maiúsculos ou especiais.');
 		}
 	}
 
 	public validatePassword(password: string, otherPassword?: string): void {
+		if (otherPassword !== undefined && otherPassword !== password) {
+			throw new Error('Senhas não correspondem!');
+		}
 		if (password.length >= this.MAX_PASSWORD_LENGTH) {
 			throw new Error('Excedeu o tamanho máximo.');
 		}
@@ -49,9 +52,6 @@ export class UserService {
 		}
 		if (password.length < this.MIN_PASSWORD_LENGTH) {
 			throw new Error('Não satisfaz comprimento mínimo');
-		}
-		if (otherPassword && otherPassword !== password) {
-			throw new Error('Senhas não correspondem!');
 		}
 	}
 
