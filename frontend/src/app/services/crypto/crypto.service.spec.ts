@@ -31,13 +31,12 @@ describe('CryptoService', () => {
 	});
 
 	it('should derive from passphrase, wrap and unwrap keys', async () => {
-		// We import the wrapping key
+		// We derive a new wrapping key
 		const wrappingKeyResult = await deriveWrappingKeyFromPassphrase(
 			USER_PASSPHRASE,
 		);
 		expect(wrappingKeyResult).toBeTruthy();
-		const wrappingKey = wrappingKeyResult.key;
-		expect(wrappingKey).toBeTruthy();
+		expect(wrappingKeyResult.key).toBeTruthy();
 
 		// Generate the encryption key (wrapping requires 'extractable' flag)
 		const encryptionKey = await generateKey(
@@ -54,7 +53,7 @@ describe('CryptoService', () => {
 		// Wrap encryption key
 		const wrappedKeyData = await wrapKey(
 			encryptionKey,
-			wrappingKey,
+			wrappingKeyResult.key,
 		);
 		expect(wrappedKeyData).toBeTruthy();
 		expect(wrappedKeyData.iv).toBeTruthy();
@@ -62,10 +61,19 @@ describe('CryptoService', () => {
 		expect(wrappedKeyData.data).toBeTruthy();
 		expect(wrappedKeyData.data.byteLength).toBeGreaterThan(0);
 
-		// Unwrap encrypted key
+		// We derive the same wrapping key
+		const existingWrappingKeyResult = await deriveWrappingKeyFromPassphrase(
+			USER_PASSPHRASE,
+			wrappingKeyResult.params.salt,
+			wrappingKeyResult.params.iterationCount,
+		);
+		expect(existingWrappingKeyResult).toBeTruthy();
+		expect(existingWrappingKeyResult.key).toBeTruthy();
+
+		// Unwrap the encrypted key with the re-derived key
 		const unwrappedKey = await unwrapKey(
 			wrappedKeyData.data,
-			wrappingKey,
+			existingWrappingKeyResult.key,
 			wrappedKeyData.iv,
 			true,
 			KeyTypes.ENCRYPTION_KEY,
@@ -88,8 +96,7 @@ describe('CryptoService', () => {
 			USER_PASSPHRASE,
 		);
 		expect(wrappingKeyResult).toBeTruthy();
-		const wrappingKey = wrappingKeyResult.key;
-		expect(wrappingKey).toBeTruthy();
+		expect(wrappingKeyResult.key).toBeTruthy();
 
 		// Generate the encryption key (wrapping requires 'extractable' flag)
 		const encryptionKey = await generateKey(
@@ -101,7 +108,7 @@ describe('CryptoService', () => {
 		// Wrap encryption key
 		const wrappedKeyData = await wrapKey(
 			encryptionKey,
-			wrappingKey,
+			wrappingKeyResult.key,
 		);
 		expect(wrappedKeyData).toBeTruthy();
 		expect(wrappedKeyData.iv).toBeTruthy();
@@ -109,18 +116,19 @@ describe('CryptoService', () => {
 		expect(wrappedKeyData.data).toBeTruthy();
 		expect(wrappedKeyData.data.byteLength).toBeGreaterThan(0);
 
-		// We import the wrong wrapping key
+		// We try to re-import the wrapping key but using a wrong passphrase
 		const wrongWrappingKeyResult = await deriveWrappingKeyFromPassphrase(
 			WRONG_USER_PASSPHRASE,
+			wrappingKeyResult.params.salt,
+			wrappingKeyResult.params.iterationCount,
 		);
 		expect(wrongWrappingKeyResult).toBeTruthy();
-		const wrongWrappingKey = wrongWrappingKeyResult.key;
-		expect(wrongWrappingKey).toBeTruthy();
+		expect(wrongWrappingKeyResult.key).toBeTruthy();
 
 		// Try to unwrap encrypted key with the wrong wrapping key, should fail
 		const unwrappingKeyPromise = (async () => await unwrapKey(
 			wrappedKeyData.data,
-			wrongWrappingKey,
+			wrongWrappingKeyResult.key,
 			wrappedKeyData.iv,
 			true,
 			KeyTypes.ENCRYPTION_KEY,
