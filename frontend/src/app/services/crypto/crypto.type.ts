@@ -1,6 +1,7 @@
 enum KeyTypeEnum {
 	ENCRYPTION_KEY = 'ENCRYPTION_KEY',
 	WRAPPING_KEY = 'WRAPPING_KEY',
+	DERIVING_KEY = 'DERIVING_KEY',
 };
 
 export interface KeyType {
@@ -10,6 +11,12 @@ export interface KeyType {
 export interface EncryptionResult {
 	readonly iv: ArrayBuffer;
 	readonly data: ArrayBuffer;
+};
+
+export interface DerivedWrappingKey {
+	readonly salt: ArrayBuffer;
+	readonly iterationCount: number;
+	readonly wrappingKey: CryptoKey;
 };
 
 type IKeyType = {
@@ -22,5 +29,8 @@ export const KeyTypes: IKeyType = {
 	},
 	[KeyTypeEnum.WRAPPING_KEY]: {
 		keyUsages: ['wrapKey', 'unwrapKey'],
+	},
+	[KeyTypeEnum.DERIVING_KEY]: {
+		keyUsages: ['deriveBits', 'deriveKey'],
 	},
 };

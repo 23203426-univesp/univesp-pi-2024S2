@@ -54,7 +54,10 @@ export default [
 					allowSingleLine: true,
 				},
 			],
-			'@stylistic/function-paren-newline': ['error', 'multiline'],
+			'@stylistic/function-paren-newline': [
+				'error',
+				'multiline-arguments',
+			],
 			'@stylistic/array-bracket-newline': [
 				'error',
 				{

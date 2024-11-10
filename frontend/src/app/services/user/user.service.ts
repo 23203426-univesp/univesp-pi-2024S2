@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { RegisterRequest, User, UserType } from './user.type';
+import { RegisterRequest, UserType } from './user.type';
 import { CryptoService } from '@services/crypto/crypto.service';
 import { KeyTypes } from '@services/crypto/crypto.type';
 
@@ -68,23 +68,21 @@ export class UserService {
 			true,
 			KeyTypes.ENCRYPTION_KEY,
 		);
-		const wrappingKey = await this.cryptoService.generateKey(
-			true,
-			KeyTypes.WRAPPING_KEY,
-		);
-		const exportedWrappingKey
-			= await this.cryptoService.exportKey(wrappingKey);
-		const wrappedEncryptionKey = await this.cryptoService.wrapKey(
+		const wrappingKey
+		= await this.cryptoService.deriveWrappingKeyFromPassphrase(passphrase);
+
+		const wrappedEncryptionKey
+		= await this.cryptoService.wrapKey(
 			encryptionKey,
-			wrappingKey,
-			passphrase,
+			wrappingKey.wrappingKey,
 		);
 
 		const registerRequest: RegisterRequest = {
 			username: username,
 			password: password,
-			wrappingKeyData: exportedWrappingKey,
-			encryptionKey: wrappedEncryptionKey,
+			wrappingKeySalt: wrappingKey.salt,
+			wrappingKeyIterationCount: wrappingKey.iterationCount,
+			wrappedEncryptionKey: wrappedEncryptionKey,
 		};
 	}
 

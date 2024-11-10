@@ -4,19 +4,21 @@ import { EncryptionResult } from '@services/crypto/crypto.type';
 export interface RegisterRequest {
 	readonly username: string;
 	readonly password: string;
-	// Exported wrapping key
-	readonly wrappingKeyData: ArrayBuffer;
-	// Needs to be unwrapped to be used (requires user's passphrase)
-	readonly encryptionKey: EncryptionResult;
+	// Data needed to remake the wrapping key
+	readonly wrappingKeySalt: ArrayBuffer;
+	readonly wrappingKeyIterationCount: number;
+	// Needs to be unwrapped to be used
+	readonly wrappedEncryptionKey: EncryptionResult;
 };
 
 // Response from register API
 export interface RegisterResponse {
 	readonly username: string;
-	// Exported wrapping key
-	readonly wrappingKeyData: ArrayBuffer;
-	// Needs to be unwrapped to be used (requires user's passphrase)
-	readonly encryptionKey: EncryptionResult;
+	// Data needed to remake the wrapping key
+	readonly wrappingKeySalt: ArrayBuffer;
+	readonly wrappingKeyIterationCount: number;
+	// Needs to be unwrapped to be used
+	readonly wrappedEncryptionKey: EncryptionResult;
 };
 
 // Request to login API
@@ -29,12 +31,18 @@ export interface LogInRequest {
 export type LogInResponse = RegisterResponse;
 
 // Logged-in user type
-export interface User {
+export interface LockedUser {
 	readonly username: string;
-	// Imported wrapping key for the encryption key
-	readonly wrappingKey: CryptoKey;
-	// Needs to be unwrapped to be used (requires user's passphrase)
-	readonly encryptionKey: EncryptionResult;
+	// Data needed to remake the wrapping key
+	readonly wrappingKeySalt: ArrayBuffer;
+	readonly wrappingKeyIterationCount: number;
+	// Needs to be unwrapped to be used
+	readonly wrappedEncryptionKey: EncryptionResult;
 };
 
-export type UserType = User | undefined;
+// Unlocked user type
+export interface UnlockedUser extends LockedUser {
+	readonly wrappingKey: CryptoKey;
+};
+
+export type UserType = UnlockedUser | LockedUser | undefined;

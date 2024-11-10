@@ -37,6 +37,7 @@ export class UsernameFieldComponent implements OnChanges {
 	}
 
 	validateUsername() {
+		this.username = this.username.toLowerCase();
 		try {
 			this.userService.validateUsername(this.username);
 			this.usernameValid = true;
