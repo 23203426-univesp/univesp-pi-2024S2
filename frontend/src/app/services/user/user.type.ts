@@ -1,24 +1,22 @@
-import { EncryptionResult } from '@services/crypto/crypto.type';
+import { EncryptedData, WrappingKeyParams } from '@services/crypto/crypto.type';
 
 // Request to register API
 export interface RegisterRequest {
 	readonly username: string;
 	readonly password: string;
 	// Data needed to remake the wrapping key
-	readonly wrappingKeySalt: ArrayBuffer;
-	readonly wrappingKeyIterationCount: number;
+	readonly passphraseKey: WrappingKeyParams;
 	// Needs to be unwrapped to be used
-	readonly wrappedEncryptionKey: EncryptionResult;
+	readonly wrappedEncryptionKey: EncryptedData;
 };
 
 // Response from register API
 export interface RegisterResponse {
 	readonly username: string;
 	// Data needed to remake the wrapping key
-	readonly wrappingKeySalt: ArrayBuffer;
-	readonly wrappingKeyIterationCount: number;
+	readonly passphraseKey: WrappingKeyParams;
 	// Needs to be unwrapped to be used
-	readonly wrappedEncryptionKey: EncryptionResult;
+	readonly wrappedEncryptionKey: EncryptedData;
 };
 
 // Request to login API
@@ -34,10 +32,9 @@ export type LogInResponse = RegisterResponse;
 export interface LockedUser {
 	readonly username: string;
 	// Data needed to remake the wrapping key
-	readonly wrappingKeySalt: ArrayBuffer;
-	readonly wrappingKeyIterationCount: number;
+	readonly passphraseKey: WrappingKeyParams;
 	// Needs to be unwrapped to be used
-	readonly wrappedEncryptionKey: EncryptionResult;
+	readonly wrappedEncryptionKey: EncryptedData;
 };
 
 // Unlocked user type

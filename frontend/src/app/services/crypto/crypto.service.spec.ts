@@ -1,10 +1,20 @@
 import { TestBed } from '@angular/core/testing';
 
 import { CryptoService } from './crypto.service';
-import { KeyTypes } from './crypto.type';
+import {
+	KeyTypes,
+	deriveWrappingKeyFromPassphrase,
+	generateKey,
+	encrypt,
+	decrypt,
+	wrapKey,
+	exportKey,
+	unwrapKey,
+} from './web-crypto-api.wrapper';
 
 describe('CryptoService', () => {
 	let service: CryptoService;
+
 	const ENCRYPTED_DATA_LENGTH = 4096;
 	const USER_PASSPHRASE = 'passphrase_shouldBe!S3CURE;';
 	const WRONG_USER_PASSPHRASE = 'passphrase_shouldBe!S3CURe;';
@@ -20,26 +30,27 @@ describe('CryptoService', () => {
 
 	it('should derive from passphrase, wrap and unwrap keys', async () => {
 		// We import the wrapping key
-		const wrappingKeyResult
-		= await service.deriveWrappingKeyFromPassphrase(USER_PASSPHRASE);
+		const wrappingKeyResult = await deriveWrappingKeyFromPassphrase(
+			USER_PASSPHRASE,
+		);
 		expect(wrappingKeyResult).toBeTruthy();
-		const wrappingKey = wrappingKeyResult.wrappingKey;
+		const wrappingKey = wrappingKeyResult.key;
 		expect(wrappingKey).toBeTruthy();
 
 		// Generate the encryption key (wrapping requires 'extractable' flag)
-		const encryptionKey = await service.generateKey(
+		const encryptionKey = await generateKey(
 			true,
 			KeyTypes.ENCRYPTION_KEY,
 		);
 		expect(encryptionKey).toBeTruthy();
 
 		// Export encryption key (for comparison)
-		const rawEncryptionKey = await service.exportKey(encryptionKey);
+		const rawEncryptionKey = await exportKey(encryptionKey);
 		expect(rawEncryptionKey).toBeTruthy();
 		expect(rawEncryptionKey.byteLength).toBeGreaterThan(0);
 
 		// Wrap encryption key
-		const wrappedKeyData = await service.wrapKey(
+		const wrappedKeyData = await wrapKey(
 			encryptionKey,
 			wrappingKey,
 		);
@@ -50,7 +61,7 @@ describe('CryptoService', () => {
 		expect(wrappedKeyData.data.byteLength).toBeGreaterThan(0);
 
 		// Unwrap encrypted key
-		const unwrappedKey = await service.unwrapKey(
+		const unwrappedKey = await unwrapKey(
 			wrappedKeyData.data,
 			wrappingKey,
 			wrappedKeyData.iv,
@@ -60,7 +71,7 @@ describe('CryptoService', () => {
 		expect(unwrappedKey).toBeTruthy();
 
 		// Export unwrapped encryption key
-		const rawUnwrappedKey = await service.exportKey(unwrappedKey);
+		const rawUnwrappedKey = await exportKey(unwrappedKey);
 		expect(rawUnwrappedKey).toBeTruthy();
 		expect(rawUnwrappedKey.byteLength).toBeGreaterThan(0);
 
@@ -71,21 +82,22 @@ describe('CryptoService', () => {
 
 	it('should fail to unwrap key on wrong passphrase', async () => {
 		// We import the correct wrapping key
-		const wrappingKeyResult
-		= await service.deriveWrappingKeyFromPassphrase(USER_PASSPHRASE);
+		const wrappingKeyResult = await deriveWrappingKeyFromPassphrase(
+			USER_PASSPHRASE,
+		);
 		expect(wrappingKeyResult).toBeTruthy();
-		const wrappingKey = wrappingKeyResult.wrappingKey;
+		const wrappingKey = wrappingKeyResult.key;
 		expect(wrappingKey).toBeTruthy();
 
 		// Generate the encryption key (wrapping requires 'extractable' flag)
-		const encryptionKey = await service.generateKey(
+		const encryptionKey = await generateKey(
 			true,
 			KeyTypes.ENCRYPTION_KEY,
 		);
 		expect(encryptionKey).toBeTruthy();
 
 		// Wrap encryption key
-		const wrappedKeyData = await service.wrapKey(
+		const wrappedKeyData = await wrapKey(
 			encryptionKey,
 			wrappingKey,
 		);
@@ -96,14 +108,15 @@ describe('CryptoService', () => {
 		expect(wrappedKeyData.data.byteLength).toBeGreaterThan(0);
 
 		// We import the wrong wrapping key
-		const wrongWrappingKeyResult
-		= await service.deriveWrappingKeyFromPassphrase(WRONG_USER_PASSPHRASE);
+		const wrongWrappingKeyResult = await deriveWrappingKeyFromPassphrase(
+			WRONG_USER_PASSPHRASE,
+		);
 		expect(wrongWrappingKeyResult).toBeTruthy();
-		const wrongWrappingKey = wrongWrappingKeyResult.wrappingKey;
+		const wrongWrappingKey = wrongWrappingKeyResult.key;
 		expect(wrongWrappingKey).toBeTruthy();
 
 		// Try to unwrap encrypted key with the wrong wrapping key, should fail
-		const unwrappingKeyPromise = (async () => await service.unwrapKey(
+		const unwrappingKeyPromise = (async () => await unwrapKey(
 			wrappedKeyData.data,
 			wrongWrappingKey,
 			wrappedKeyData.iv,
@@ -115,7 +128,7 @@ describe('CryptoService', () => {
 
 	it('should encrypt and decrypt data', async () => {
 		// Generate encryption key for test
-		const key = await service.generateKey(false, KeyTypes.ENCRYPTION_KEY);
+		const key = await generateKey(false, KeyTypes.ENCRYPTION_KEY);
 		expect(key).toBeTruthy();
 
 		// Generate data to be encrypted
@@ -125,7 +138,7 @@ describe('CryptoService', () => {
 		expect(rawData.byteLength).toEqual(ENCRYPTED_DATA_LENGTH);
 
 		// Encrypt data
-		const encryptedData = await service.encrypt(key, rawData);
+		const encryptedData = await encrypt(key, rawData);
 		expect(encryptedData).toBeTruthy();
 		expect(encryptedData.iv).toBeTruthy();
 		expect(encryptedData.iv.byteLength).toBeGreaterThan(0);
@@ -136,7 +149,7 @@ describe('CryptoService', () => {
 			.not.toEqual(new Uint8Array(rawData));
 
 		// Decrypt data
-		const decryptedData = await service.decrypt(
+		const decryptedData = await decrypt(
 			key,
 			encryptedData.iv,
 			encryptedData.data,
@@ -149,7 +162,7 @@ describe('CryptoService', () => {
 
 	it('should fail decryption if invalid key', async () => {
 		// Generate encryption key
-		const encryptionKey = await service.generateKey(
+		const encryptionKey = await generateKey(
 			false,
 			KeyTypes.ENCRYPTION_KEY,
 		);
@@ -162,7 +175,7 @@ describe('CryptoService', () => {
 		expect(rawData.byteLength).toEqual(ENCRYPTED_DATA_LENGTH);
 
 		// Encrypt data
-		const encryptedData = await service.encrypt(encryptionKey, rawData);
+		const encryptedData = await encrypt(encryptionKey, rawData);
 		expect(encryptedData).toBeTruthy();
 		expect(encryptedData.iv).toBeTruthy();
 		expect(encryptedData.iv.byteLength).toBeGreaterThan(0);
@@ -173,14 +186,14 @@ describe('CryptoService', () => {
 			.not.toEqual(new Uint8Array(rawData));
 
 		// Generate another different key for decryption
-		const wrongKey = await service.generateKey(
+		const wrongKey = await generateKey(
 			false,
 			KeyTypes.ENCRYPTION_KEY,
 		);
 		expect(wrongKey).toBeTruthy();
 
 		// Try to decrypt data
-		const decryptionPromise = (async () => await service.decrypt(
+		const decryptionPromise = (async () => await decrypt(
 			wrongKey,
 			encryptedData.iv,
 			encryptedData.data,
@@ -190,7 +203,7 @@ describe('CryptoService', () => {
 
 	it('should encrypt into different data every time', async () => {
 		// Generate encryption key
-		const encryptionKey = await service.generateKey(
+		const encryptionKey = await generateKey(
 			false,
 			KeyTypes.ENCRYPTION_KEY,
 		);
@@ -203,7 +216,7 @@ describe('CryptoService', () => {
 		expect(rawData.byteLength).toEqual(ENCRYPTED_DATA_LENGTH);
 
 		// Encrypt the first time
-		const firstEncryptionData = await service.encrypt(
+		const firstEncryptionData = await encrypt(
 			encryptionKey,
 			rawData,
 		);
@@ -214,7 +227,7 @@ describe('CryptoService', () => {
 		expect(firstEncryptionData.data.byteLength).toBeGreaterThan(0);
 
 		// Encrypt the second time
-		const secondEncryptionData = await service.encrypt(
+		const secondEncryptionData = await encrypt(
 			encryptionKey,
 			rawData,
 		);
