@@ -10,12 +10,14 @@ import {
 	wrapKey,
 	exportKey,
 	unwrapKey,
+	bytesToBase64,
+	base64ToBytes,
 } from './web-crypto-api.wrapper';
 
 describe('CryptoService', () => {
 	let service: CryptoService;
 
-	const ENCRYPTED_DATA_LENGTH = 4096;
+	const EXAMPLE_DATA_LENGTH = 4096;
 	const USER_PASSPHRASE = 'passphrase_shouldBe!S3CURE;';
 	const WRONG_USER_PASSPHRASE = 'passphrase_shouldBe!S3CURe;';
 
@@ -133,9 +135,9 @@ describe('CryptoService', () => {
 
 		// Generate data to be encrypted
 		const rawData
-		= crypto.getRandomValues(new Uint8Array(ENCRYPTED_DATA_LENGTH));
+		= crypto.getRandomValues(new Uint8Array(EXAMPLE_DATA_LENGTH));
 		expect(rawData).toBeTruthy();
-		expect(rawData.byteLength).toEqual(ENCRYPTED_DATA_LENGTH);
+		expect(rawData.byteLength).toEqual(EXAMPLE_DATA_LENGTH);
 
 		// Encrypt data
 		const encryptedData = await encrypt(key, rawData);
@@ -170,9 +172,9 @@ describe('CryptoService', () => {
 
 		// Generate data to be encrypted
 		const rawData
-		= crypto.getRandomValues(new Uint8Array(ENCRYPTED_DATA_LENGTH));
+		= crypto.getRandomValues(new Uint8Array(EXAMPLE_DATA_LENGTH));
 		expect(rawData).toBeTruthy();
-		expect(rawData.byteLength).toEqual(ENCRYPTED_DATA_LENGTH);
+		expect(rawData.byteLength).toEqual(EXAMPLE_DATA_LENGTH);
 
 		// Encrypt data
 		const encryptedData = await encrypt(encryptionKey, rawData);
@@ -211,9 +213,9 @@ describe('CryptoService', () => {
 
 		// Generate data to be encrypted
 		const rawData
-		= crypto.getRandomValues(new Uint8Array(ENCRYPTED_DATA_LENGTH));
+		= crypto.getRandomValues(new Uint8Array(EXAMPLE_DATA_LENGTH));
 		expect(rawData).toBeTruthy();
-		expect(rawData.byteLength).toEqual(ENCRYPTED_DATA_LENGTH);
+		expect(rawData.byteLength).toEqual(EXAMPLE_DATA_LENGTH);
 
 		// Encrypt the first time
 		const firstEncryptionData = await encrypt(
@@ -242,5 +244,25 @@ describe('CryptoService', () => {
 			.not.toEqual(new Uint8Array(firstEncryptionData.data));
 		expect(new Uint8Array(secondEncryptionData.iv))
 			.not.toEqual(new Uint8Array(firstEncryptionData.iv));
+	});
+
+	it('should convert to and from base64', async () => {
+		// Generate example data
+		const exampleData = crypto.getRandomValues(
+			new Uint8Array(EXAMPLE_DATA_LENGTH),
+		);
+
+		// Encode to base64
+		const dataUrl = await bytesToBase64(exampleData);
+		expect(typeof dataUrl).toBe('string');
+		expect(dataUrl.length).toBeTruthy();
+
+		// Decode base64
+		const binaryData = await base64ToBytes(dataUrl);
+		expect(binaryData).toBeTruthy();
+		expect(binaryData.byteLength).toEqual(EXAMPLE_DATA_LENGTH);
+
+		// Should be equal
+		expect(new Uint8Array(exampleData)).toEqual(new Uint8Array(binaryData));
 	});
 });

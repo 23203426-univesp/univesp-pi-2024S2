@@ -31,6 +31,9 @@ export interface WrappingKey {
 	readonly key: CryptoKey;
 };
 
+const BASE64_DATA_URL_PREFIX = 'data:application/octet-stream;base64,';
+
+const TEXT_ENCODING = 'utf-8';
 const TEXT_ENCODER = new TextEncoder();
 
 const KEY_FORMAT = 'raw';
@@ -46,20 +49,67 @@ const AES_KEY_LENGTH = 256;
 const AES_TAG_LENGTH = 128;
 
 function validateBufferLength(buffer: BufferSource, expectedLength: number) {
-	if (buffer.byteLength !== expectedLength) {
-		throw new Error(`Expected buffer of size ${expectedLength}, `
-			+ `but got ${buffer.byteLength}.`);
+	if (!buffer || buffer.byteLength !== expectedLength) {
+		throw new Error(`Expected buffer of length ${expectedLength}, `
+			+ `but got ${buffer.byteLength || buffer}.`);
+	}
+}
+
+function validateTruthyBuffer(buffer: BufferSource) {
+	if (!buffer || !buffer.byteLength) {
+		throw new Error(`Expected buffer of any length, `
+			+ `but got ${buffer.byteLength || buffer}`);
 	}
 }
 
 function encodeTrimmedPassphrase(passphrase: string): Uint8Array {
 	// Validates encoding is consistent between all environments
-	if (TEXT_ENCODER.encoding !== 'utf-8') {
-		throw new Error(`Expected 'utf-8' for TextEncoder's encoding, `
-			+ `but got '${TEXT_ENCODER.encoding}'.`);
+	if (TEXT_ENCODER.encoding !== TEXT_ENCODING) {
+		throw new Error(`Expected '${TEXT_ENCODING}' for TextEncoder's `
+			+ `encoding, but got '${TEXT_ENCODER.encoding}'.`);
 	}
 	// Trim and encode
 	return TEXT_ENCODER.encode(passphrase.trim());
+}
+
+// eslint-disable-next-line @stylistic/max-len
+// Source: https://developer.mozilla.org/en-US/docs/Web/API/Window/btoa#converting_arbitrary_binary_data
+function bytesToBase64DataUrl(
+	buffer: BufferSource,
+	type = 'application/octet-stream',
+): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = Object.assign(new FileReader(), {
+			onload: () => {
+				if (typeof reader.result === 'string') {
+					resolve(reader.result);
+				} else {
+					reject(`typeof reader.result isn't a string: `
+						+ `${typeof reader.result}`);
+				}
+			},
+			onerror: () => reject(reader.error),
+		});
+		reader.readAsDataURL(new File([buffer], '', { type }));
+	});
+}
+
+async function dataUrlToBytes(dataUrl: string) {
+	const res = await fetch(dataUrl);
+	return new Uint8Array(await res.arrayBuffer());
+}
+
+export async function bytesToBase64(buffer: BufferSource): Promise<string> {
+	const dataUrl = await bytesToBase64DataUrl(buffer);
+	if (!dataUrl.startsWith(BASE64_DATA_URL_PREFIX)) {
+		throw new Error(`Base64 Data URL didn't start with the expected `
+			+ `prefix: ${dataUrl.slice(0, BASE64_DATA_URL_PREFIX.length)}`);
+	}
+	return dataUrl.slice(BASE64_DATA_URL_PREFIX.length);
+}
+
+export function base64ToBytes(base64: string) {
+	return dataUrlToBytes(BASE64_DATA_URL_PREFIX + base64);
 }
 
 export async function generateKey(
@@ -167,6 +217,7 @@ export async function wrapKey(
 			tagLength: AES_TAG_LENGTH,
 		},
 	);
+	validateTruthyBuffer(rawWrappedKey);
 
 	return {
 		iv: iv,
@@ -218,6 +269,7 @@ export async function encrypt(
 		key,
 		data,
 	);
+	validateTruthyBuffer(rawEncryptedData);
 
 	return {
 		iv: iv,

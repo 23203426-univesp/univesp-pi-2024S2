@@ -1,6 +1,11 @@
 package router
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,24 +32,78 @@ func setupRoutes(engine *gin.Engine) {
 	// engine.POST("/login", userLogin)
 }
 
-type EncryptedData struct {
-	Iv   []byte `json:"iv" binding:"required"`
-	Data []byte `json:"data" binding:"required"`
+type Base64WrappingKeyParams struct {
+	Base64Salt     string `json:"salt" binding:"required"`
+	IterationCount uint   `json:"iterationCount" binding:"required"`
+}
+
+type Base64EncryptedData struct {
+	Base64Iv   string `json:"iv" binding:"required"`
+	Base64Data string `json:"data" binding:"required"`
 }
 
 type RegisterRequest struct {
-	Username      string        `json:"username" binding:"required"`
-	Password      string        `json:"password" binding:"required"`
-	WrappingKey   []byte        `json:"wrappingKeyData" binding:"required"`
-	EncryptionKey EncryptedData `json:"encryptionKey" binding:"required"`
+	Username             string                  `json:"username" binding:"required"`
+	Password             string                  `json:"password" binding:"required"`
+	WrappingKeyParams    Base64WrappingKeyParams `json:"wrappingKeyParams" binding:"required"`
+	WrappedEncryptionKey Base64EncryptedData     `json:"wrappedEncryptionKey" binding:"required"`
+}
+
+type WrappingKeyParams struct {
+	Salt           []byte
+	IterationCount uint
+}
+
+type EncryptedData struct {
+	Iv   []byte
+	Data []byte
 }
 
 func userRegister(context *gin.Context) {
+	// Read request body
 	post := RegisterRequest{}
-	if err := context.BindJSON(&post); err != nil {
+	err := context.BindJSON(&post)
+	if err != nil {
 		context.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+
+	hash := sha256.New()
+
+	wrappedEncryptionKeyData, err := base64.StdEncoding.DecodeString(post.WrappedEncryptionKey.Base64Data)
+	if err != nil {
+		context.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	hash.Write(wrappedEncryptionKeyData)
+	fmt.Printf("encryption key data: %x\n", hash.Sum(nil))
+	hash.Reset()
+
+	wrappedEncryptionKeyIv, err := base64.StdEncoding.DecodeString(post.WrappedEncryptionKey.Base64Iv)
+	if err != nil {
+		context.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	hash.Write(wrappedEncryptionKeyIv)
+	fmt.Printf("encryption key iv: %x\n", hash.Sum(nil))
+	hash.Reset()
+
+	wrappingKeyParamsSalt, err := base64.StdEncoding.DecodeString(post.WrappingKeyParams.Base64Salt)
+	if err != nil {
+		context.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	hash.Write(wrappingKeyParamsSalt)
+	fmt.Printf("wrapping key salt: %x\n", hash.Sum(nil))
+	hash.Reset()
+
+	// Print json
+	resultJson, err := json.Marshal(post)
+	if err != nil {
+		context.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("%s\n", resultJson)
 
 	context.JSON(http.StatusOK, &post)
 }

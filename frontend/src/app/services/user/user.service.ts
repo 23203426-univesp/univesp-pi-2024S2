@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, Observable } from 'rxjs';
 import { RegisterRequest, UserType } from './user.type';
 import { CryptoService } from '@services/crypto/crypto.service';
+import { HttpClient } from '@angular/common/http';
 
 @Injectable({
 	providedIn: 'root',
@@ -15,7 +16,11 @@ export class UserService {
 	private readonly user
 		= new BehaviorSubject<UserType>(undefined);
 
-	constructor(private router: Router, private cryptoService: CryptoService) {}
+	constructor(
+		private router: Router,
+		private http: HttpClient,
+		private cryptoService: CryptoService,
+	) {}
 
 	public getUser$(): Observable<UserType> {
 		return this.user.asObservable();
@@ -70,9 +75,16 @@ export class UserService {
 		const registerRequest: RegisterRequest = {
 			username: username,
 			password: password,
-			passphraseKey: newKeys.wrappingKeyParams,
+			wrappingKeyParams: newKeys.wrappingKeyParams,
 			wrappedEncryptionKey: newKeys.wrappedEncryptionKey,
 		};
+		console.log(JSON.stringify(registerRequest));
+
+		const response = await firstValueFrom(
+			this.http.post('http://localhost:8080/register', registerRequest),
+		);
+		console.log('response =', response);
+		throw response;
 	}
 
 	public async login(username: string, password: string): Promise<void> {

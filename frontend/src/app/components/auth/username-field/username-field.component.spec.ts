@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { UsernameFieldComponent } from './username-field.component';
+import { UserService } from '@services/user/user.service';
 
 describe('UsernameFieldComponent', () => {
 	let component: UsernameFieldComponent;
@@ -8,7 +9,12 @@ describe('UsernameFieldComponent', () => {
 
 	beforeEach(async () => {
 		await TestBed.configureTestingModule({
-			imports: [UsernameFieldComponent],
+			providers: [
+				{
+					provide: UserService,
+					useValue: {},
+				},
+			],
 		})
 			.compileComponents();
 

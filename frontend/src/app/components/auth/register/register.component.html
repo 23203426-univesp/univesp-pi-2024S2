@@ -11,7 +11,7 @@
 <app-password-field [inputId]="'passphrase-2-input'" [inputLabel]="'Repetir senha de desbloqueio: '" [disabled]="callingApi" [otherPassword]="passphrase" (validatedInput)="changedPassphrase2($event)"></app-password-field>
 
 <div>
-	<button (click)="submitRegister()" [disabled]="callingApi || !usernameValid || !password1Valid || !password2Valid || !passphrase1Valid || !passphrase2Valid">Entrar</button>
+	<button (click)="submitRegister()" [disabled]="callingApi || !usernameValid || !password1Valid || !password2Valid || !passphrase1Valid || !passphrase2Valid">Registrar</button>
 	<strong [hidden]="!registerError">
 		{{registerError}}
 	</strong>

@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { PasswordFieldComponent } from './password-field.component';
+import { UserService } from '@services/user/user.service';
 
 describe('PasswordFieldComponent', () => {
 	let component: PasswordFieldComponent;
@@ -8,7 +9,12 @@ describe('PasswordFieldComponent', () => {
 
 	beforeEach(async () => {
 		await TestBed.configureTestingModule({
-			imports: [PasswordFieldComponent],
+			providers: [
+				{
+					provide: UserService,
+					useValue: {},
+				},
+			],
 		})
 			.compileComponents();
 
