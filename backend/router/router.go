@@ -1,15 +1,23 @@
 package router
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"golang.org/x/crypto/bcrypt"
+	"rafaelsms.com/psico/database"
 
 	"github.com/gin-gonic/gin"
 )
+
+const SALT_LENGTH = 32
+const IV_LENGTH = 12
+const BCRYPT_COST = 12
 
 func Setup() *gin.Engine {
 	var engine *gin.Engine = gin.Default()
@@ -22,8 +30,8 @@ func setupEngine(engine *gin.Engine) {
 }
 
 func setupRoutes(engine *gin.Engine) {
-	engine.GET("/ping", func(context *gin.Context) {
-		context.JSON(http.StatusOK, gin.H{
+	engine.GET("/ping", func(ginCtx *gin.Context) {
+		ginCtx.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
@@ -32,88 +40,106 @@ func setupRoutes(engine *gin.Engine) {
 	// engine.POST("/login", userLogin)
 }
 
-type Base64WrappingKeyParams struct {
-	Base64Salt     string `json:"salt" binding:"required"`
-	IterationCount uint   `json:"iterationCount" binding:"required"`
-}
-
-type Base64EncryptedData struct {
-	Base64Iv   string `json:"iv" binding:"required"`
-	Base64Data string `json:"data" binding:"required"`
-}
-
-type RegisterRequest struct {
-	Username             string                  `json:"username" binding:"required"`
-	Password             string                  `json:"password" binding:"required"`
-	WrappingKeyParams    Base64WrappingKeyParams `json:"wrappingKeyParams" binding:"required"`
-	WrappedEncryptionKey Base64EncryptedData     `json:"wrappedEncryptionKey" binding:"required"`
-}
-
-type WrappingKeyParams struct {
-	Salt           []byte
-	IterationCount uint
-}
-
-type EncryptedData struct {
-	Iv   []byte
-	Data []byte
-}
-
-func userRegister(context *gin.Context) {
-	// Read request body
+func userRegister(ginCtx *gin.Context) {
+	// Read and validate request body
 	post := RegisterRequest{}
-	err := context.BindJSON(&post)
+	err := ginCtx.BindJSON(&post)
 	if err != nil {
-		context.AbortWithStatus(http.StatusBadRequest)
+		ginCtx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	err = checkArrayLength(post.WrappingKeyParams.Salt, SALT_LENGTH)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	err = checkArrayLength(post.WrappedEncryptionKey.Iv, IV_LENGTH)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 
-	hash := sha256.New()
-
-	wrappedEncryptionKeyData, err := base64.StdEncoding.DecodeString(post.WrappedEncryptionKey.Base64Data)
+	// Run the password through bcrypt
+	bcryptPassword, err := bcrypt.GenerateFromPassword(post.Password, BCRYPT_COST)
 	if err != nil {
-		context.AbortWithStatus(http.StatusInternalServerError)
+		ginCtx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	hash.Write(wrappedEncryptionKeyData)
-	fmt.Printf("encryption key data: %x\n", hash.Sum(nil))
-	hash.Reset()
-
-	wrappedEncryptionKeyIv, err := base64.StdEncoding.DecodeString(post.WrappedEncryptionKey.Base64Iv)
-	if err != nil {
-		context.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	hash.Write(wrappedEncryptionKeyIv)
-	fmt.Printf("encryption key iv: %x\n", hash.Sum(nil))
-	hash.Reset()
-
-	wrappingKeyParamsSalt, err := base64.StdEncoding.DecodeString(post.WrappingKeyParams.Base64Salt)
-	if err != nil {
-		context.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	hash.Write(wrappingKeyParamsSalt)
-	fmt.Printf("wrapping key salt: %x\n", hash.Sum(nil))
-	hash.Reset()
 
 	// Print json
 	resultJson, err := json.Marshal(post)
 	if err != nil {
-		context.AbortWithStatus(http.StatusInternalServerError)
+		ginCtx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	log.Printf("%s\n", resultJson)
+	log.Printf("POST body: %s\n", resultJson)
 
-	context.JSON(http.StatusOK, &post)
+	saltArray := [SALT_LENGTH]byte(post.WrappingKeyParams.Salt)
+	ivArray := [IV_LENGTH]byte(post.WrappedEncryptionKey.Iv)
+
+	user := database.User{
+		Username: post.Username,
+		Password: bcryptPassword,
+		WrappingKeyParams: database.WrappingKeyParams{
+			Salt:           saltArray,
+			IterationCount: post.WrappingKeyParams.IterationCount,
+		},
+		WrappedEncryptionKey: database.EncryptedData{
+			Iv:   ivArray,
+			Data: post.WrappedEncryptionKey.Data,
+		},
+	}
+	resultBson, err := bson.Marshal(user)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	var unmarshalBson bson.M
+	err = bson.Unmarshal(resultBson, &unmarshalBson)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	resultJson, err = json.MarshalIndent(unmarshalBson, "", "\t")
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	log.Printf("User: %s\n", resultJson)
+
+	ctx, cancel := context.WithTimeoutCause(
+		context.Background(),
+		10*time.Second,
+		fmt.Errorf("request timed out"),
+	)
+	defer cancel()
+	err = database.InsertNewUser(ctx, user)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	ginCtx.JSON(http.StatusOK, &post)
 }
 
 // func userLogin(context *gin.Context) {
 // 	post := Test{}
 // 	if err := context.BindJSON(&post); err != nil {
-// 		context.AbortWithStatus(http.StatusBadRequest)
+// 		context.AbortWithError(http.StatusBadRequest, err)
 // 		return
 // 	}
 
 // 	context.JSON(http.StatusOK, &post)
 // }
+
+func checkArrayLength[K interface{}](array []K, expectedLength int) error {
+	if len(array) != expectedLength {
+		return fmt.Errorf(
+			"expected array of length %d, got %d instead",
+			expectedLength,
+			len(array),
+		)
+	}
+	return nil
+}

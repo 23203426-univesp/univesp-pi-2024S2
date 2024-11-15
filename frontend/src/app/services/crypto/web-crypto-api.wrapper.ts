@@ -31,6 +31,10 @@ export interface WrappingKey {
 	readonly key: CryptoKey;
 };
 
+// WARNING Constants NEED to be in sync with the backend validator
+// WARNING Constants NEED to be in sync with the backend validator
+// WARNING Constants NEED to be in sync with the backend validator
+
 const BASE64_DATA_URL_PREFIX = 'data:application/octet-stream;base64,';
 
 const TEXT_ENCODING = 'utf-8';
@@ -45,6 +49,7 @@ const PBKDF2_HASH_ALGORITHM = 'SHA-256';
 const PBKDF2_SALT_LENGTH = 32;
 
 const AES_GCM_ALGORITHM = 'AES-GCM';
+const AES_IV_LENGTH = 12;
 const AES_KEY_LENGTH = 256;
 const AES_TAG_LENGTH = 128;
 
@@ -62,7 +67,7 @@ function validateTruthyBuffer(buffer: BufferSource) {
 	}
 }
 
-function encodeTrimmedPassphrase(passphrase: string): Uint8Array {
+export function encodeTrimmedPassphrase(passphrase: string): Uint8Array {
 	// Validates encoding is consistent between all environments
 	if (TEXT_ENCODER.encoding !== TEXT_ENCODING) {
 		throw new Error(`Expected '${TEXT_ENCODING}' for TextEncoder's `
@@ -205,7 +210,7 @@ export async function wrapKey(
 	keyToWrap: CryptoKey,
 	wrappingKey: CryptoKey,
 ): Promise<EncryptedData> {
-	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const iv = crypto.getRandomValues(new Uint8Array(AES_IV_LENGTH));
 
 	const rawWrappedKey = await crypto.subtle.wrapKey(
 		KEY_FORMAT,
@@ -232,7 +237,7 @@ export async function unwrapKey(
 	extractable: boolean,
 	keyType: KeyType,
 ): Promise<CryptoKey> {
-	validateBufferLength(iv, 12);
+	validateBufferLength(iv, AES_IV_LENGTH);
 
 	return await crypto.subtle.unwrapKey(
 		KEY_FORMAT,
@@ -258,7 +263,7 @@ export async function encrypt(
 	key: CryptoKey,
 	data: BufferSource,
 ): Promise<EncryptedData> {
-	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const iv = crypto.getRandomValues(new Uint8Array(AES_IV_LENGTH));
 
 	const rawEncryptedData = await crypto.subtle.encrypt(
 		{
@@ -282,7 +287,7 @@ export async function decrypt(
 	iv: BufferSource,
 	encryptedData: BufferSource,
 ): Promise<ArrayBuffer> {
-	validateBufferLength(iv, 12);
+	validateBufferLength(iv, AES_IV_LENGTH);
 
 	return await crypto.subtle.decrypt(
 		{

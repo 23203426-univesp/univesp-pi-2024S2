@@ -10,11 +10,10 @@ import { HttpClient } from '@angular/common/http';
 })
 export class UserService {
 	private readonly USERNAME_REGEX = /^[a-z0-9_]{4,16}$/;
-	private readonly MIN_PASSWORD_LENGTH = 8;
-	private readonly MAX_PASSWORD_LENGTH = 128;
+	private readonly MIN_PASSWORD_BYTES_LENGTH = 8;
+	private readonly MAX_PASSWORD_BYTES_LENGTH = 72;
 
-	private readonly user
-		= new BehaviorSubject<UserType>(undefined);
+	private readonly user = new BehaviorSubject<UserType>(undefined);
 
 	constructor(
 		private router: Router,
@@ -37,15 +36,20 @@ export class UserService {
 		}
 	}
 
-	public validatePassword(password: string, otherPassword?: string): void {
+	public validatePassword(
+		password: string,
+		otherPassword?: string,
+	): Uint8Array {
 		if (otherPassword !== undefined && otherPassword !== password) {
 			throw new Error('Senhas não correspondem!');
 		}
-		if (password.length >= this.MAX_PASSWORD_LENGTH) {
-			throw new Error('Excedeu o tamanho máximo.');
-		}
 		if (password.trim() !== password) {
 			throw new Error('Não pode começar ou terminar com espaços.');
+		}
+		const encodedPassword
+			= this.cryptoService.encodeTrimmedPassphrase(password);
+		if (encodedPassword.byteLength > this.MAX_PASSWORD_BYTES_LENGTH) {
+			throw new Error('Excedeu o comprimento máximo.');
 		}
 		if (!/[A-Z]/.test(password)) {
 			throw new Error('Deve conter pelo menos uma maiúscula');
@@ -54,9 +58,10 @@ export class UserService {
 			throw new Error('Deve conter pelo menos um caractere especial e/ou '
 				+ 'dígito.');
 		}
-		if (password.length < this.MIN_PASSWORD_LENGTH) {
+		if (encodedPassword.byteLength < this.MIN_PASSWORD_BYTES_LENGTH) {
 			throw new Error('Não satisfaz comprimento mínimo');
 		}
+		return encodedPassword;
 	}
 
 	public async register(
@@ -65,8 +70,10 @@ export class UserService {
 		passphrase: string,
 	): Promise<void> {
 		this.validateUsername(username);
-		this.validatePassword(password);
 		this.validatePassword(passphrase);
+		const encodedPassword = await this.cryptoService.encodeBase64(
+			this.validatePassword(password),
+		);
 
 		const newKeys = await this.cryptoService.generateNewUserKeys(
 			passphrase,
@@ -74,7 +81,7 @@ export class UserService {
 
 		const registerRequest: RegisterRequest = {
 			username: username,
-			password: password,
+			password: encodedPassword,
 			wrappingKeyParams: newKeys.wrappingKeyParams,
 			wrappedEncryptionKey: newKeys.wrappedEncryptionKey,
 		};

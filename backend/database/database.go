@@ -2,25 +2,28 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
-	"math/rand/v2"
 	"os"
-	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const USER_COLLECTION = "users"
+
 var client *mongo.Client = nil
+var database string
 
 func Init(ctx context.Context) error {
 	// Get MongoDB URI
 	uri := os.Getenv("MONGODB_URI")
 	if uri == "" {
 		return fmt.Errorf("set your 'MONGODB_URI' environment variable")
+	}
+	database = os.Getenv("DATABASE_NAME")
+	if database == "" {
+		return fmt.Errorf("set your 'DATABASE_NAME' environment variable")
 	}
 
 	// Connect to database
@@ -34,6 +37,79 @@ func Init(ctx context.Context) error {
 	err = client.Ping(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to ping MongoDB server: %s", err)
+	}
+
+	database := client.Database(database)
+
+	// Create collections and indexes
+	err = database.CreateCollection(
+		ctx,
+		USER_COLLECTION,
+		options.CreateCollection().SetValidator(bson.D{
+			{Key: "$jsonSchema", Value: bson.D{
+				{Key: "bsonType", Value: "object"},
+				{Key: "required", Value: bson.A{
+					"_id",
+					"username",
+					"password",
+					"wrapping_key_params",
+					"wrapped_encryption_key",
+				}},
+				{Key: "properties", Value: bson.D{
+					{Key: "username", Value: bson.D{
+						{Key: "bsonType", Value: "string"},
+						{Key: "pattern", Value: "^[a-z0-9_]{4,16}$"},
+					}},
+					{Key: "password", Value: bson.D{
+						{Key: "bsonType", Value: "binData"},
+					}},
+					{Key: "wrapping_key_params", Value: bson.D{
+						{Key: "bsonType", Value: "object"},
+						{Key: "required", Value: bson.A{
+							"salt",
+							"iteration_count",
+						}},
+						{Key: "properties", Value: bson.D{
+							{Key: "salt", Value: bson.D{
+								{Key: "bsonType", Value: "binData"},
+							}},
+							{Key: "iteration_count", Value: bson.D{
+								{Key: "bsonType", Value: "long"},
+								{Key: "minimum", Value: 800_000},
+								{Key: "maximum", Value: 900_000},
+							}},
+						}},
+					}},
+					{Key: "wrapped_encryption_key", Value: bson.D{
+						{Key: "bsonType", Value: "object"},
+						{Key: "required", Value: bson.A{
+							"iv",
+							"data",
+						}},
+						{Key: "properties", Value: bson.D{
+							{Key: "iv", Value: bson.D{
+								{Key: "bsonType", Value: "binData"},
+							}},
+							{Key: "data", Value: bson.D{
+								{Key: "bsonType", Value: "binData"},
+							}},
+						}},
+					}},
+				}},
+			}},
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create user collection: %s", err)
+	}
+
+	userColl := database.Collection(USER_COLLECTION)
+	_, err = userColl.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "username", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create user collection's index: %s", err)
 	}
 
 	return nil
@@ -52,53 +128,49 @@ func Disconnect(ctx context.Context) error {
 	return err
 }
 
-func randomChar() byte {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	return byte(charset[rand.IntN(len(charset))])
-}
-
-func randomString(length int) string {
-	var builder strings.Builder
-	builder.Grow(length)
-	for i := 0; i < length; i++ {
-		builder.WriteByte(randomChar())
-	}
-	return builder.String()
-}
-
-func Test(ctx context.Context) error {
+func InsertNewUser(ctx context.Context, user User) error {
 	if client == nil {
 		return fmt.Errorf("client isn't ready")
 	}
 
-	age := rand.Uint32N(100)
-	name := randomString(16)
-	testEntry := TestDocument{Name: name, Age: age}
-	coll := client.Database("psico").Collection("test")
-
-	_, err := coll.InsertOne(ctx, testEntry)
+	coll := client.Database(database).Collection(USER_COLLECTION)
+	_, err := coll.InsertOne(ctx, user)
 	if err != nil {
-		return err
-	}
-
-	cursor, err := coll.Find(ctx, bson.D{})
-	if err != nil {
-		return err
-	}
-
-	var results []TestDocument
-	err = cursor.All(ctx, &results)
-	if err != nil {
-		return err
-	}
-
-	for _, result := range results {
-		resultJson, err := json.Marshal(result)
-		if err != nil {
-			return err
-		}
-		log.Printf("%s\n", resultJson)
+		return fmt.Errorf("failed to insert new user: %s", err)
 	}
 
 	return nil
 }
+
+// func Test(ctx context.Context) error {
+
+// 	age := rand.Uint32N(100)
+// 	name := randomString(16)
+// 	testEntry := TestDocument{Name: name, Age: age}
+
+// 	_, err := coll.InsertOne(ctx, testEntry)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	cursor, err := coll.Find(ctx, bson.D{})
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	var results []TestDocument
+// 	err = cursor.All(ctx, &results)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	for _, result := range results {
+// 		resultJson, err := json.Marshal(result)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		log.Printf("%s\n", resultJson)
+// 	}
+
+// 	return nil
+// }

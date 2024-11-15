@@ -8,6 +8,7 @@ import {
 // Request to register API
 export interface RegisterRequest {
 	readonly username: string;
+	// Password needs to be a base64-encoded string
 	readonly password: string;
 	// Data needed to remake the wrapping key
 	readonly wrappingKeyParams: Base64WrappingKeyParams;

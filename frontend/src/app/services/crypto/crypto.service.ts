@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {
 	bytesToBase64,
 	deriveWrappingKeyFromPassphrase,
+	encodeTrimmedPassphrase,
 	generateKey,
 	KeyTypes,
 	wrapKey,
@@ -28,11 +29,12 @@ export class CryptoService {
 		}
 	}
 
-	private async sha256(buffer: BufferSource) {
-		const digest = await crypto.subtle.digest('SHA-256', buffer);
-		return Array.from(new Uint8Array(digest))
-			.map(item => item.toString(16).padStart(2, '0'))
-			.join('');
+	public encodeTrimmedPassphrase(passphrase: string): Uint8Array {
+		return encodeTrimmedPassphrase(passphrase);
+	}
+
+	public encodeBase64(buffer: BufferSource): Promise<string> {
+		return bytesToBase64(buffer);
 	}
 
 	public async generateNewUserKeys(
@@ -44,18 +46,6 @@ export class CryptoService {
 		const wrappedEncryptionKey = await wrapKey(
 			encryptionKey,
 			wrappingKey.key,
-		);
-		console.log(
-			'wrappingKey.params.salt: ',
-			await this.sha256(wrappingKey.params.salt),
-		);
-		console.log(
-			'wrappedEncryptionKey.iv: ',
-			await this.sha256(wrappedEncryptionKey.iv),
-		);
-		console.log(
-			'wrappedEncryptionKey.data: ',
-			await this.sha256(wrappedEncryptionKey.data),
 		);
 
 		return {
