@@ -10,8 +10,6 @@ import {
 	wrapKey,
 	exportKey,
 	unwrapKey,
-	bytesToBase64,
-	base64ToBytes,
 } from './web-crypto-api.wrapper';
 
 describe('CryptoService', () => {
@@ -261,12 +259,12 @@ describe('CryptoService', () => {
 		);
 
 		// Encode to base64
-		const dataUrl = await bytesToBase64(exampleData);
+		const dataUrl = await service.encodeBase64(exampleData);
 		expect(typeof dataUrl).toBe('string');
 		expect(dataUrl.length).toBeTruthy();
 
 		// Decode base64
-		const binaryData = await base64ToBytes(dataUrl);
+		const binaryData = await service.decodeBase64(dataUrl);
 		expect(binaryData).toBeTruthy();
 		expect(binaryData.byteLength).toEqual(EXAMPLE_DATA_LENGTH);
 

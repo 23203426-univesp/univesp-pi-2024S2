@@ -7,6 +7,17 @@ type RegisterRequest struct {
 	WrappedEncryptionKey EncryptedData     `json:"wrappedEncryptionKey" binding:"required"`
 }
 
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password []byte `json:"password" binding:"required"`
+}
+
+type LoginResponse struct {
+	Username             string            `json:"username" binding:"required"`
+	WrappingKeyParams    WrappingKeyParams `json:"wrappingKeyParams" binding:"required"`
+	WrappedEncryptionKey EncryptedData     `json:"wrappedEncryptionKey" binding:"required"`
+}
+
 type WrappingKeyParams struct {
 	Salt           []byte `json:"salt" binding:"required"`
 	IterationCount uint64 `json:"iterationCount" binding:"required"`

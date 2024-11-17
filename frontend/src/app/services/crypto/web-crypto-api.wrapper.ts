@@ -143,6 +143,7 @@ export async function deriveWrappingKeyFromPassphrase(
 	= crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_LENGTH)),
 	iterationCount: number = getIterationCount(),
 ): Promise<WrappingKey> {
+	validateBufferLength(salt, PBKDF2_SALT_LENGTH);
 	const encodedPassphrase = encodeTrimmedPassphrase(passphrase);
 
 	// Import the key from password to be used to derive the wrapping key

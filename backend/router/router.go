@@ -2,13 +2,10 @@ package router
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/crypto/bcrypt"
 	"rafaelsms.com/psico/database"
 
@@ -17,6 +14,7 @@ import (
 
 const SALT_LENGTH = 32
 const IV_LENGTH = 12
+const BCRYPT_PASSWORD_MAX_LENGTH = 72
 const BCRYPT_COST = 12
 
 func Setup() *gin.Engine {
@@ -37,7 +35,7 @@ func setupRoutes(engine *gin.Engine) {
 	})
 
 	engine.POST("/register", userRegister)
-	// engine.POST("/login", userLogin)
+	engine.POST("/login", userLogin)
 }
 
 func userRegister(ginCtx *gin.Context) {
@@ -48,12 +46,17 @@ func userRegister(ginCtx *gin.Context) {
 		ginCtx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	err = checkArrayLength(post.WrappingKeyParams.Salt, SALT_LENGTH)
+	err = checkArrayCeilingLength(post.Password, BCRYPT_PASSWORD_MAX_LENGTH)
 	if err != nil {
 		ginCtx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	err = checkArrayLength(post.WrappedEncryptionKey.Iv, IV_LENGTH)
+	err = checkArrayExactLength(post.WrappingKeyParams.Salt, SALT_LENGTH)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	err = checkArrayExactLength(post.WrappedEncryptionKey.Iv, IV_LENGTH)
 	if err != nil {
 		ginCtx.AbortWithError(http.StatusBadRequest, err)
 		return
@@ -65,14 +68,6 @@ func userRegister(ginCtx *gin.Context) {
 		ginCtx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-
-	// Print json
-	resultJson, err := json.Marshal(post)
-	if err != nil {
-		ginCtx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	log.Printf("POST body: %s\n", resultJson)
 
 	saltArray := [SALT_LENGTH]byte(post.WrappingKeyParams.Salt)
 	ivArray := [IV_LENGTH]byte(post.WrappedEncryptionKey.Iv)
@@ -89,24 +84,6 @@ func userRegister(ginCtx *gin.Context) {
 			Data: post.WrappedEncryptionKey.Data,
 		},
 	}
-	resultBson, err := bson.Marshal(user)
-	if err != nil {
-		ginCtx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	var unmarshalBson bson.M
-	err = bson.Unmarshal(resultBson, &unmarshalBson)
-	if err != nil {
-		ginCtx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	resultJson, err = json.MarshalIndent(unmarshalBson, "", "\t")
-	if err != nil {
-		ginCtx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	log.Printf("User: %s\n", resultJson)
 
 	ctx, cancel := context.WithTimeoutCause(
 		context.Background(),
@@ -120,20 +97,82 @@ func userRegister(ginCtx *gin.Context) {
 		return
 	}
 
-	ginCtx.JSON(http.StatusOK, &post)
+	response := LoginResponse{
+		Username: user.Username,
+		WrappingKeyParams: WrappingKeyParams{
+			Salt:           user.WrappingKeyParams.Salt[:],
+			IterationCount: user.WrappingKeyParams.IterationCount,
+		},
+		WrappedEncryptionKey: EncryptedData{
+			Iv:   user.WrappedEncryptionKey.Iv[:],
+			Data: user.WrappedEncryptionKey.Data,
+		},
+	}
+	ginCtx.JSON(http.StatusOK, &response)
 }
 
-// func userLogin(context *gin.Context) {
-// 	post := Test{}
-// 	if err := context.BindJSON(&post); err != nil {
-// 		context.AbortWithError(http.StatusBadRequest, err)
-// 		return
-// 	}
+func userLogin(ginCtx *gin.Context) {
+	// Read and validate request body
+	post := LoginRequest{}
+	err := ginCtx.BindJSON(&post)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	err = checkArrayCeilingLength(post.Password, BCRYPT_PASSWORD_MAX_LENGTH)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
 
-// 	context.JSON(http.StatusOK, &post)
-// }
+	// Get user from database
+	ctx, cancel := context.WithTimeoutCause(
+		context.Background(),
+		10*time.Second,
+		fmt.Errorf("request timed out"),
+	)
+	defer cancel()
+	var user database.User
+	err = database.GetUser(ctx, post.Username, &user)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusUnauthorized, err)
+		return
+	}
 
-func checkArrayLength[K interface{}](array []K, expectedLength int) error {
+	// Test given password with user's password
+	err = bcrypt.CompareHashAndPassword(user.Password, post.Password)
+	if err != nil {
+		ginCtx.AbortWithError(http.StatusUnauthorized, err)
+		return
+	}
+
+	// If nothing went wrong, return user
+	response := LoginResponse{
+		Username: user.Username,
+		WrappingKeyParams: WrappingKeyParams{
+			Salt:           user.WrappingKeyParams.Salt[:],
+			IterationCount: user.WrappingKeyParams.IterationCount,
+		},
+		WrappedEncryptionKey: EncryptedData{
+			Iv:   user.WrappedEncryptionKey.Iv[:],
+			Data: user.WrappedEncryptionKey.Data,
+		},
+	}
+	ginCtx.JSON(http.StatusOK, &response)
+}
+
+func checkArrayCeilingLength[K interface{}](array []K, ceilingLength int) error {
+	if len(array) > ceilingLength {
+		return fmt.Errorf(
+			"expected array length of at most %d, got %d instead",
+			ceilingLength,
+			len(array),
+		)
+	}
+	return nil
+}
+
+func checkArrayExactLength[K interface{}](array []K, expectedLength int) error {
 	if len(array) != expectedLength {
 		return fmt.Errorf(
 			"expected array of length %d, got %d instead",

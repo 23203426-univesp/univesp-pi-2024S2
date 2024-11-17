@@ -1,7 +1,13 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, firstValueFrom, Observable } from 'rxjs';
-import { RegisterRequest, UserType } from './user.type';
+import {
+	isValidLoginResponse,
+	LockedUser,
+	LogInRequest,
+	RegisterRequest,
+	UserType,
+} from './user.type';
 import { CryptoService } from '@services/crypto/crypto.service';
 import { HttpClient } from '@angular/common/http';
 
@@ -66,17 +72,17 @@ export class UserService {
 
 	public async register(
 		username: string,
-		password: string,
-		passphrase: string,
+		accountPassword: string,
+		unlockingPassphrase: string,
 	): Promise<void> {
 		this.validateUsername(username);
-		this.validatePassword(passphrase);
+		this.validatePassword(unlockingPassphrase);
 		const encodedPassword = await this.cryptoService.encodeBase64(
-			this.validatePassword(password),
+			this.validatePassword(accountPassword),
 		);
 
 		const newKeys = await this.cryptoService.generateNewUserKeys(
-			passphrase,
+			unlockingPassphrase,
 		);
 
 		const registerRequest: RegisterRequest = {
@@ -85,20 +91,73 @@ export class UserService {
 			wrappingKeyParams: newKeys.wrappingKeyParams,
 			wrappedEncryptionKey: newKeys.wrappedEncryptionKey,
 		};
-		console.log(JSON.stringify(registerRequest));
-
 		const response = await firstValueFrom(
 			this.http.post('http://localhost:8080/register', registerRequest),
 		);
-		console.log('response =', response);
-		throw response;
+		if (!isValidLoginResponse(response)) {
+			throw new Error('Falha ao interpretar resposta do servidor.');
+		}
+
+		const user: LockedUser = {
+			username: response.username,
+			wrappingKeyParams: {
+				salt: await this.cryptoService.decodeBase64(
+					response.wrappingKeyParams.salt,
+				),
+				iterationCount: response.wrappingKeyParams.iterationCount,
+			},
+			wrappedEncryptionKey: {
+				iv: await this.cryptoService.decodeBase64(
+					response.wrappedEncryptionKey.iv,
+				),
+				data: await this.cryptoService.decodeBase64(
+					response.wrappedEncryptionKey.data,
+				),
+			},
+		};
+		this.user.next(user);
+
+		const succeeded = await this.router.navigateByUrl('/');
+		if (!succeeded) {
+			throw new Error('Falha ao redirecionar.');
+		}
 	}
 
 	public async login(username: string, password: string): Promise<void> {
 		this.validateUsername(username);
-		this.validatePassword(password);
+		const encodedPassword = await this.cryptoService.encodeBase64(
+			this.validatePassword(password),
+		);
 
-		// this.user.next(username);
+		const loginRequest: LogInRequest = {
+			username: username,
+			password: encodedPassword,
+		};
+		const response = await firstValueFrom(
+			this.http.post('http://localhost:8080/login', loginRequest),
+		);
+		if (!isValidLoginResponse(response)) {
+			throw new Error('Falha ao interpretar resposta do servidor.');
+		}
+
+		const user: LockedUser = {
+			username: response.username,
+			wrappingKeyParams: {
+				salt: await this.cryptoService.decodeBase64(
+					response.wrappingKeyParams.salt,
+				),
+				iterationCount: response.wrappingKeyParams.iterationCount,
+			},
+			wrappedEncryptionKey: {
+				iv: await this.cryptoService.decodeBase64(
+					response.wrappedEncryptionKey.iv,
+				),
+				data: await this.cryptoService.decodeBase64(
+					response.wrappedEncryptionKey.data,
+				),
+			},
+		};
+		this.user.next(user);
 
 		const succeeded = await this.router.navigateByUrl('/');
 		if (!succeeded) {

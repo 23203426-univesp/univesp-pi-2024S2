@@ -2,6 +2,8 @@ import {
 	Base64EncryptedData,
 	Base64WrappingKeyParams,
 	EncryptedData,
+	isValidBase64EncryptedData,
+	isValidBase64WrappingKeyParams,
 	WrappingKeyParams,
 } from '@services/crypto/crypto.type';
 
@@ -49,3 +51,13 @@ export interface UnlockedUser extends LockedUser {
 };
 
 export type UserType = UnlockedUser | LockedUser | undefined;
+
+export function isValidLoginResponse(arg: unknown): arg is RegisterResponse {
+	return !!arg
+		&& typeof arg === 'object'
+		&& 'username' in arg && typeof arg.username === 'string'
+		&& 'wrappingKeyParams' in arg
+		&& isValidBase64WrappingKeyParams(arg.wrappingKeyParams)
+		&& 'wrappedEncryptionKey' in arg
+		&& isValidBase64EncryptedData(arg.wrappedEncryptionKey);
+}

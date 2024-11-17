@@ -142,35 +142,16 @@ func InsertNewUser(ctx context.Context, user User) error {
 	return nil
 }
 
-// func Test(ctx context.Context) error {
+func GetUser(ctx context.Context, username string, user *User) error {
+	if client == nil {
+		return fmt.Errorf("client isn't ready")
+	}
 
-// 	age := rand.Uint32N(100)
-// 	name := randomString(16)
-// 	testEntry := TestDocument{Name: name, Age: age}
+	coll := client.Database(database).Collection(USER_COLLECTION)
+	err := coll.FindOne(ctx, bson.D{{Key: "username", Value: username}}).Decode(&user)
+	if err != nil {
+		return fmt.Errorf("failed to find user: %s", err)
+	}
 
-// 	_, err := coll.InsertOne(ctx, testEntry)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	cursor, err := coll.Find(ctx, bson.D{})
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	var results []TestDocument
-// 	err = cursor.All(ctx, &results)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	for _, result := range results {
-// 		resultJson, err := json.Marshal(result)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		log.Printf("%s\n", resultJson)
-// 	}
-
-// 	return nil
-// }
+	return nil
+}

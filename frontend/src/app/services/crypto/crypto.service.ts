@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import {
+	base64ToBytes,
 	bytesToBase64,
 	deriveWrappingKeyFromPassphrase,
 	encodeTrimmedPassphrase,
@@ -35,6 +36,10 @@ export class CryptoService {
 
 	public encodeBase64(buffer: BufferSource): Promise<string> {
 		return bytesToBase64(buffer);
+	}
+
+	public decodeBase64(base64: string): Promise<Uint8Array> {
+		return base64ToBytes(base64);
 	}
 
 	public async generateNewUserKeys(
