@@ -19,10 +19,6 @@ func main() {
 	database.Init(context.Background())
 	defer database.Disconnect(context.Background())
 
-	// ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	// defer cancel()
-	// database.Test(ctx)
-
 	// Initialize and run router
 	r := router.Setup()
 	r.Run()
